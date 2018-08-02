@@ -81,7 +81,7 @@ def svm_loss_vectorized(W, X, y, reg):
     #############################################################################
     num_classes = W.shape[1]
     num_examples = X.shape[0]
-    
+
     scores = np.matmul(X, W)
     
     # Subtract the correct label from each example
