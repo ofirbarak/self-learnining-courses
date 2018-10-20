@@ -265,6 +265,9 @@ class FullyConnectedNet(object):
             relu, cache['relu'+str(i)] = relu_forward(relu_input)
             hidden_result = relu
             
+            if self.use_dropout:
+                    hidden_result, cache['dropout'+str(i)] = dropout_forward(relu, self.dropout_param)
+            
         last_affine, cache['affine'+str(self.num_layers)] = affine_forward(hidden_result, self.params['W'+str(self.num_layers)], self.params['b'+str(self.num_layers)])
         scores = last_affine
                     
@@ -305,7 +308,11 @@ class FullyConnectedNet(object):
         
         # compute the loss and gradient on the rest layers
         for i in range(self.num_layers-1, 0, -1):
-            drelu = relu_backward(daffine, cache['relu'+str(i)])
+            drelu_input = daffine
+            if self.use_dropout:
+                drelu_input = dropout_backward(daffine, cache['dropout'+str(i)])
+                
+            drelu = relu_backward(drelu_input, cache['relu'+str(i)])
             daffine_input = drelu
             
             if self.normalization == 'batchnorm':
