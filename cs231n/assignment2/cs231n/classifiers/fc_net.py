@@ -176,13 +176,23 @@ class FullyConnectedNet(object):
         # beta2, etc. Scale parameters should be initialized to ones and shift     #
         # parameters should be initialized to zeros.                               #
         ############################################################################
-        sizes = [input_dim] + hidden_dims + [num_classes]
-        for i in range(self.num_layers):
+        prev = input_dim
+        for i in range(self.num_layers-1):
             self.params['W'+str(i+1)] = np.random.normal(0, 
                                                        weight_scale, 
-                                                       size=(sizes[i], sizes[i+1]))
-            self.params['b'+str(i+1)] = np.zeros(sizes[i+1])
+                                                       size=(prev, hidden_dims[i]))
+            self.params['b'+str(i+1)] = np.zeros(hidden_dims[i])
             
+            if normalization == 'batchnorm':
+                self.params['gamma'+str(i+1)] = np.ones(hidden_dims[i])
+                self.params['beta'+str(i+1)] = np.zeros(hidden_dims[i])
+                
+            prev = hidden_dims[i]
+                
+        self.params['W'+str(self.num_layers)] = np.random.normal(0, 
+                                                           weight_scale, 
+                                                           size=(prev, num_classes))
+        self.params['b'+str(self.num_layers)] = np.zeros(num_classes)
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -245,12 +255,19 @@ class FullyConnectedNet(object):
         cache = {}
         for i in range(1, self.num_layers):
             affine, cache['affine'+str(i)] = affine_forward(hidden_result, self.params['W'+str(i)], self.params['b'+str(i)])
+            relu_input = affine
             
-            relu, cache['relu'+str(i)] = relu_forward(affine)
+            if self.normalization=='batchnorm':
+                bnorm, cache['batchnorm'+str(i)] = batchnorm_forward(affine, self.params['gamma'+str(i)], self.params['beta'+str(i)], self.bn_params[i-1])
+                relu_input = bnorm
+                    
+            
+            relu, cache['relu'+str(i)] = relu_forward(relu_input)
             hidden_result = relu
             
         last_affine, cache['affine'+str(self.num_layers)] = affine_forward(hidden_result, self.params['W'+str(self.num_layers)], self.params['b'+str(self.num_layers)])
         scores = last_affine
+                    
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -289,8 +306,13 @@ class FullyConnectedNet(object):
         # compute the loss and gradient on the rest layers
         for i in range(self.num_layers-1, 0, -1):
             drelu = relu_backward(daffine, cache['relu'+str(i)])
+            daffine_input = drelu
             
-            daffine, grads['W'+str(i)], grads['b'+str(i)] = affine_backward(drelu, cache['affine'+str(i)])
+            if self.normalization == 'batchnorm':
+                dbnorm, grads['gamma'+str(i)], grads['beta'+str(i)] = batchnorm_backward(drelu, cache['batchnorm'+str(i)])
+                daffine_input = dbnorm
+                
+            daffine, grads['W'+str(i)], grads['b'+str(i)] = affine_backward(daffine_input, cache['affine'+str(i)])
             grads['W'+str(i)] += self.reg*self.params['W'+str(i)]
             
             
